@@ -20,6 +20,10 @@ var (
 	RedisAddr = "localhost:6379"
 )
 
+type server struct {
+	db *db.Database
+}
+
 func dbHandlePointsPost(database *db.Database) func(echo.Context) error {
 	return func(c echo.Context) error {
 		var userJson db.User
@@ -62,7 +66,43 @@ func dbHandleLeaderboardsGet(database *db.Database) func(echo.Context) error {
 	}
 }
 
+func (s *server) handleLeaderboardsGet() func(echo.Context) error {
+	return func(c echo.Context) error {
+		leaderboard, err := s.db.GetLeaderboard()
+		if err != nil {
+			if err == db.ErrNil {
+				return c.NoContent(http.StatusNotFound)
+			}
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		return c.JSON(http.StatusOK, leaderboard)
+	}
+}
+
+func newServer() *server {
+	s := &server{}
+	return s
+}
+
+func exampleClient2() {
+
+	e := echo.New()
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+
+	s := newServer()
+
+	database, err := db.NewDatabase(RedisAddr)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	s.db = database
+	e.GET("/leaderboards", s.handleLeaderboardsGet())
+}
+
 func exampleClient() {
+
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
